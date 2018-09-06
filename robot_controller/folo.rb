@@ -1,14 +1,7 @@
 #!/usr/bin/ruby
 require "socket"
 require "observer"
-#require "pi_piper"
-
-#GPIO_16 = PiPiper::Pin.new(:pin => 16, :direction => :out)
-#GPIO_20 = PiPiper::Pin.new(:pin => 20, :direction => :out)
-#GPIO_21 = PiPiper::Pin.new(:pin => 21, :direction => :out)
-# GPIO_13 = PiPiper::Pin.new(:pin => 13, :direction => :out)
-# GPIO_19 = PiPiper::Pin.new(:pin => 19, :direction => :out)
-# GPIO_26 = PiPiper::Pin.new(:pin => 26, :direction => :out)
+require "pi_piper"
 
 class State
   NOT_OVERRRIDE = 'not override error'
@@ -22,43 +15,61 @@ class State
 end
 
 class Forward < State
+  def initialize(pin1, pin2)
+    @pin1 = pin1
+    @pin2 = pin2
+  end
+
   def pin()
-    return "forward"
+    @pin1.off
+    @pin2.on
   end
 
   def update(flag)
     if flag == 0
-      Stop.new
+      Stop.new(@pin1, @pin2)
     elsif flag == -1
-      Backward.new
+      Backward.new(@pin1, @pin2)
     end
   end
 end
 
 class Backward < State
+  def initialize(pin1, pin2)
+    @pin1 = pin1
+    @pin2 = pin2
+  end
+
   def pin()
-    return "backward"
+    @pin1.on
+    @pin2.off
   end
 
   def update(flag)
     if flag == 0
-      Stop.new
+      Stop.new(@pin1, @pin2)
     elsif flag == 1
-      Forward.new
+      Forward.new(@pin1, @pin2)
     end
   end
 end
 
 class Stop < State
+  def initialize(pin1, pin2)
+    @pin1 = pin1
+    @pin2 = pin2
+  end
+
   def pin()
-    return "stop"
+    @pin1.off
+    @pin2.off
   end
 
   def update(flag)
     if flag == 1
-      Forward.new
+      Forward.new(@pin1, @pin2)
     elsif flag == -1
-      Backward.new
+      Backward.new(@pin1, @pin2)
     end
   end
 end
@@ -67,8 +78,13 @@ class StateManager
   include Observable
 
   def initialize()
-    @body_state = Stop.new
-    @leg_state = Stop.new
+    gpio_in1 = PiPiper::Pin.new(:pin => 26, :direction => :out)
+    gpio_in2 = PiPiper::Pin.new(:pin => 19, :direction => :out)
+    gpio_in3 = PiPiper::Pin.new(:pin => 20, :direction => :out)
+    gpio_in4 = PiPiper::Pin.new(:pin => 21, :direction => :out)
+
+    @body_state = Stop.new(gpio_in1, gpio_in2)
+    @leg_state = Stop.new(gpio_in3, gpio_in4)
   end
 
   def format(message)
@@ -106,17 +122,8 @@ class StateManager
   end
 end
 
-class Pin
-  def update(key, pin)
-    p key
-    p pin
-  end
-end
-
 if __FILE__ == $0
   stateManager = StateManager.new
-  pin = Pin.new
-  stateManager.add_observer(pin)
 
   udps = UDPSocket.open()
   udps.bind("0.0.0.0", 10000)
